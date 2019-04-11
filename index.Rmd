@@ -1,0 +1,116 @@
+---
+title: "Practical Machine Learning Project"
+author: "Ana Real"
+date: "April 11, 2019"
+output: 
+  html_document:
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Prediction Assignment Writeup.
+
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+### Reading the data
+
+```{r read, cache=TRUE}
+training <- read.csv2("./../pml-training.csv", header=TRUE, sep=",",na.strings = c("NA","DIV/0!",""))
+testing <- read.csv2("./../pml-testing.csv", header=TRUE, sep=",",na.strings = c("NA","DIV/0!",""))
+```
+
+### Cleaning the data
+
+Removing columns with many missing values and the columns that do not have to do with the exercise, in this case the first 7 variables from the dataset. I also had to convert to numeric variables as R was reading some of them as factors.
+
+```{r clean}
+cols = sapply(1:160,function(x)sum(is.na(training[,x])))
+numcol = which(cols>0)
+training <- training[,-numcol]
+training <- training[,-c(1:7)]
+for(i in 1:52){
+    training[,i] <- as.numeric(as.character(training[,i]))
+}
+testing <- testing[,-numcol]
+testing <- testing[,-c(1:7)]
+for(i in 1:52){
+    testing[,i] <- as.numeric(as.character(testing[,i]))
+}
+```
+
+### Trainin the model
+
+Since the goal variable "classe" is categorical using decision trees is a good model to compare random forest will be implemented with cross validation for 3. I also decided to create a validation set to have a better idea of the accuracy of the models.
+
+```{r cv, warning=FALSE}
+library(caret)
+set.seed(101)
+inTrain <- createDataPartition(training$classe, p=0.8, list=FALSE)
+training <- training[inTrain,]
+validation <- training[-inTrain,]
+cross <- trainControl(method = "cv", number = 3)
+```
+
+```{r tree, cache=TRUE}
+# Trees
+model1 <- train(classe~., data=training, method = "rpart", trControl = cross)
+```
+
+```{r forest, cache=TRUE}
+# Random Forest
+model2 <- train(classe~., data=training, method = "rf", trControl = cross)
+```
+
+### Checking accuracy in the training set
+
+```{r acc, cache=TRUE}
+# For trees
+pmodel1 <- predict(model1, training)
+confusionMatrix(pmodel1, training$classe)
+confusionMatrix(pmodel1, training$classe)$overall[1]
+
+# For random forest
+pmodel2 <- predict(model2, training)
+confusionMatrix(pmodel2, training$classe)
+confusionMatrix(pmodel2, training$classe)$overall[1]
+```
+
+### Evaluation in the validation set
+
+```{r test}
+# For trees
+pmodel1t <- predict(model1, validation)
+confusionMatrix(pmodel1t, validation$classe)
+confusionMatrix(pmodel1t, validation$classe)$overall[1]
+
+# For random forest
+pmodel2t <- predict(model2, validation)
+confusionMatrix(pmodel2t, validation$classe)
+confusionMatrix(pmodel2t, validation$classe)$overall[1]
+```
+
+### Getting predictions for test set
+
+```{r pred}
+
+# With trees
+p1 <- predict(model1,testing)
+p1
+
+# With Random Forest
+p2 <- predict(model2,testing)
+p2
+
+# Comparing
+table(p1,p2)
+
+```
+
+### Conclusions
+
+Random forest got better accuracy in the training and validation for training it was perfect and for validation it was .99. In the prediction for the test set it is possible to see that tress could not predict labels D and E. So random forest was the best model for this data set.
